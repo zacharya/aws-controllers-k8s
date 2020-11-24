@@ -15,7 +15,6 @@ package runtime
 
 import (
 	"errors"
-
 	flag "github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	ctrlrt "sigs.k8s.io/controller-runtime"
@@ -30,6 +29,7 @@ const (
 	flagAWSAccountID         = "aws-account-id"
 	flagAWSRegion            = "aws-region"
 	flagLogLevel             = "log-level"
+	flagAWSTags              = "aws-tags"
 )
 
 type Config struct {
@@ -40,6 +40,7 @@ type Config struct {
 	AccountID                string
 	Region                   string
 	LogLevel                 string
+	AWSTags                  map[string]string
 }
 
 func (cfg *Config) BindFlags() {
@@ -79,6 +80,11 @@ func (cfg *Config) BindFlags() {
 		&cfg.LogLevel, flagLogLevel,
 		"info",
 		"The log level. Default is info. We use logr interface which only supports info and debug level",
+	)
+	flag.StringToStringVar(
+		&cfg.AWSTags, flagAWSTags,
+		make(map[string]string),
+		"The AWS Tags to apply to resources managed by the controller provided in a comma delimited key value pair e.g. \"foo=bar,baz=qux\"",
 	)
 }
 

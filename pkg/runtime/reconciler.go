@@ -15,6 +15,9 @@ package runtime
 
 import (
 	"context"
+	"fmt"
+	"github.com/aws/aws-controllers-k8s/pkg/runtime/tagging"
+	"github.com/aws/aws-sdk-go/aws/session"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -49,6 +52,7 @@ type reconciler struct {
 	cfg     Config
 	cache   ackrtcache.Caches
 	metrics *ackmetrics.Metrics
+	tagger  tagging.Tagger
 }
 
 // GroupKind returns the string containing the API group and kind reconciled by
@@ -74,6 +78,9 @@ func (r *reconciler) BindControllerManager(mgr ctrlrt.Manager) error {
 	r.kc = mgr.GetClient()
 	r.cache = ackrtcache.New(clientset, r.log)
 	r.cache.Run()
+
+	r.tagger = tagging.NewResourceGroupsTagger(r.cfg.AWSTags)
+
 	rd := r.rmf.ResourceDescriptor()
 	return ctrlrt.NewControllerManagedBy(
 		mgr,
@@ -132,7 +139,7 @@ func (r *reconciler) reconcile(req ctrlrt.Request) error {
 		return r.cleanup(ctx, rm, res)
 	}
 
-	return r.sync(ctx, rm, res)
+	return r.sync(ctx, rm, res, sess)
 }
 
 // sync ensures that the supplied AWSResource's backing API resource
@@ -141,6 +148,7 @@ func (r *reconciler) sync(
 	ctx context.Context,
 	rm acktypes.AWSResourceManager,
 	desired acktypes.AWSResource,
+	sess *session.Session,
 ) error {
 	var latest acktypes.AWSResource // the newly created or mutated resource
 
@@ -238,6 +246,11 @@ func (r *reconciler) sync(
 			return requeue.NeededAfter(
 				ackerr.TemporaryOutOfSync, requeue.DefaultRequeueAfterDuration)
 		}
+	}
+	
+	resourceArn := desired.Identifiers().ARN()
+	if err := r.tagger.SyncTags(resourceArn, sess); err != nil {
+		return fmt.Errorf("syncing AWS tags: %s", err)
 	}
 	return nil
 }

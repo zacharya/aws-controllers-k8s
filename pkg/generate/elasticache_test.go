@@ -765,4 +765,3 @@ func TestElasticache_Additional_CacheParameterGroup_Spec(t *testing.T) {
 	assert := assert.New(t)
 	assert.Contains(crd.SpecFields, "ParameterNameValues")
 }
-
